@@ -25,19 +25,34 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('🔄 Fetching homepage auctions...')
     fetch('/api/auctions')
-      .then(res => res.json())
+      .then(res => {
+        console.log('📡 Home API Response status:', res.status)
+        return res.json()
+      })
       .then(data => {
+        console.log('📦 Home API Response:', data)
         if (data.success && data.data) {
           setAuctions(data.data.slice(0, 3))
           setStats(prev => ({ ...prev, auctions: data.data.length }))
         }
       })
-      .catch(() => setLoading(false))
+      .catch(error => {
+        console.error('❌ Error fetching homepage auctions:', error)
+        setLoading(false)
+      })
   }, [])
 
   return (
     <div className="max-w-7xl mx-auto px-4">
+      {/* Debug Panel */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-purple-200 rounded-xl text-sm">
+        <h4 className="font-semibold text-purple-800 mb-2">🔧 Connection Status</h4>
+        <p>Auctions Loaded: <span className="font-semibold">{auctions.length}</span> / 3</p>
+        <p className="text-xs text-purple-600 mt-1">Check browser console (F12) for detailed API logs</p>
+      </div>
+
       {/* Hero Section */}
       <section className="py-24 text-center relative">
         {/* Background decoration */}
