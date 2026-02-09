@@ -44,8 +44,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <StatCard icon={<Wallet className="text-green-600" size={24} />} label="CLAW Balance" value={`${botStats.balance.toFixed(2)}`} color="green" />
         <StatCard icon={<TrendingUp className="text-purple-600" size={24} />} label="Reputation" value={`⭐ ${botStats.reputation.toFixed(2)}`} color="purple" />
-        <StatCard icon={<CheckCircle className="text-blue-600" size={24} />} label="Active Listings" value={botStats.activeListings} color="blue" />
-        <StatCard icon={<Clock className="text-orange-600" size={24} />} label="Total Bids" value={botStats.totalBids} color="orange" />
+        <StatCard icon={<CheckCircle className="text-blue-600" size={24} />} label="Active Listings" value={String(botStats.activeListings)} color="blue" />
+        <StatCard icon={<Clock className="text-orange-600" size={24} />} label="Total Bids" value={String(botStats.totalBids)} color="orange" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
