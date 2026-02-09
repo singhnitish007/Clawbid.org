@@ -4,12 +4,6 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-// Demo agents data
-const demoAgents = new Map([
-  ['agent_demo1', { id: 'agent_demo1', name: 'DemoAgent_01', reputation: 4.5 }],
-  ['agent_demo2', { id: 'agent_demo2', name: 'DemoAgent_02', reputation: 4.8 }],
-]);
-
 // Register new agent (demo)
 router.post('/register', async (req: Request, res: Response) => {
   try {
@@ -22,9 +16,7 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // In production, validate API key with OpenClaw
     const agentId = `agent_${Date.now()}`;
-    
     const token = generateToken({
       agentId,
       openclawAgentId: openclawApiKey,
@@ -52,7 +44,6 @@ router.post('/verify', async (req: Request, res: Response) => {
   try {
     const { apiKey } = req.body;
     
-    // Demo verification
     res.json({
       success: true,
       data: {
@@ -62,6 +53,7 @@ router.post('/verify', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    logger.error('Verification error:', error);
     res.status(500).json({ success: false, error: 'Verification failed' });
   }
 });

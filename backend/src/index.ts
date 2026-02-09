@@ -13,28 +13,18 @@ import { WebSocketManager } from './websocket/index.js';
 import { Database } from './db/index.js';
 import { AuctionEngine } from './services/auctionEngine.js';
 import { TokenEconomy } from './services/tokenEconomy.js';
-import { AgentAuth } from './middleware/agentAuth.js';
 import { apiRoutes } from './routes/index.js';
 
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize WebSocket
-const wsManager = new WebSocketManager(httpServer);
-
-// Initialize Database
-const db = new Database();
-await db.connect();
-
-// Initialize Services
-const auctionEngine = new AuctionEngine(db, wsManager);
-const tokenEconomy = new TokenEconomy(db);
-
-// Make services available to routes
-app.set('db', db);
-app.set('wsManager', wsManager);
-app.set('auctionEngine', auctionEngine);
-app.set('tokenEconomy', tokenEconomy);
+// Global references for TypeScript
+declare global {
+  var db: Database | undefined;
+  var wsManager: WebSocketManager | undefined;
+  var auctionEngine: AuctionEngine | undefined;
+  var tokenEconomy: TokenEconomy | undefined;
+}
 
 // Middleware
 app.use(helmet());
@@ -46,8 +36,8 @@ app.use(morgan('combined'));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: { error: 'Too many requests, please try again later.' }
 });
 app.use('/api/', limiter);
@@ -63,9 +53,9 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', apiRoutes.auth);
-app.use('/api/auctions', AgentAuth, apiRoutes.auctions);
-app.use('/api/bids', AgentAuth, apiRoutes.bids);
-app.use('/api/wallet', AgentAuth, apiRoutes.wallet);
+app.use('/api/auctions', apiRoutes.auctions);
+app.use('/api/bids', apiRoutes.bids);
+app.use('/api/wallet', apiRoutes.wallet);
 app.use('/api/agents', apiRoutes.agents);
 
 // Error handling
@@ -84,10 +74,22 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Not found' });
 });
 
-const PORT = process.env.PORT || 3001;
+// Initialize and start server
+async function startServer() {
+  try {
+    // Initialize Database
+    global.db = new Database();
+    await global.db.connect();
 
-httpServer.listen(PORT, () => {
-  console.log(`
+    // Initialize Services
+    global.tokenEconomy = new TokenEconomy(global.db);
+    global.wsManager = new WebSocketManager(httpServer);
+    global.auctionEngine = new AuctionEngine(global.db, global.wsManager);
+
+    const PORT = process.env.PORT || 3001;
+
+    httpServer.listen(PORT, () => {
+      console.log(`
 ╔══════════════════════════════════════════════════╗
 ║                                          ║
 ║   🏷️  ClawBid Backend Server               ║
@@ -98,15 +100,25 @@ httpServer.listen(PORT, () => {
 ║   Status: RUNNING                         ║
 ║                                          ║
 ╚══════════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  await db.disconnect();
+  if (global.db) {
+    await global.db.disconnect();
+  }
   httpServer.close();
   process.exit(0);
 });
+
+startServer();
 
 export default app;

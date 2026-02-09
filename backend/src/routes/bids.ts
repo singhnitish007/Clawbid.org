@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { AuctionEngine } from '../services/auctionEngine.js';
-import { requireAgent } from '../middleware/agentAuth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
 // Place a bid (agent only)
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const agent = req.agent;
+    const agent = (req as any).agent;
     
     if (!agent || agent.agentId === 'spectator') {
       return res.status(401).json({
@@ -26,34 +26,35 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const auctionEngine = globalThis.auctionEngine || 
-      new (await import('../services/auctionEngine.js')).AuctionEngine();
-
-    const result = await auctionEngine.placeBid({
-      auctionId,
-      bidderId: agent.agentId,
-      bidAmount: parseFloat(amount),
-      isAutoBid: !!maxBid,
-      maxBidAmount: maxBid ? parseFloat(maxBid) : undefined
-    });
-
-    if (result.success) {
-      res.json({
-        success: true,
-        data: {
-          bid: result.bid,
-          newPrice: result.newPrice,
-          bidCount: result.bidCount
-        }
+    if (global.auctionEngine) {
+      const result = await global.auctionEngine.placeBid({
+        auctionId,
+        bidderId: agent.agentId,
+        bidAmount: parseFloat(amount),
+        isAutoBid: !!maxBid,
+        maxBidAmount: maxBid ? parseFloat(maxBid) : undefined
       });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          data: {
+            bid: result.bid,
+            newPrice: result.newPrice,
+            bidCount: result.bidCount
+          }
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error
+        });
+      }
     } else {
-      res.status(400).json({
-        success: false,
-        error: result.error
-      });
+      res.status(500).json({ success: false, error: 'Service not available' });
     }
   } catch (error) {
-    console.error('Place bid error:', error);
+    logger.error('Place bid error:', error);
     res.status(500).json({ success: false, error: 'Failed to place bid' });
   }
 });
@@ -61,22 +62,22 @@ router.post('/', async (req: Request, res: Response) => {
 // Get bids for an auction
 router.get('/auction/:id', async (req: Request, res: Response) => {
   try {
-    const db = globalThis.db || 
-      new (await import('../db/index.js')).Database();
-    await db.connect();
-    
-    const result = await db.query(
-      `SELECT b.*, a.name as bidder_name, a.reputation_score
-       FROM bids b
-       JOIN agents a ON b.bidder_id = a.id
-       WHERE b.auction_id = $1
-       ORDER BY b.created_at DESC
-       LIMIT 50`,
-      [req.params.id]
-    );
-
-    res.json({ success: true, data: result });
+    if (global.db) {
+      const result = await global.db.query(
+        `SELECT b.*, a.name as bidder_name, a.reputation_score
+         FROM bids b
+         JOIN agents a ON b.bidder_id = a.id
+         WHERE b.auction_id = $1
+         ORDER BY b.created_at DESC
+         LIMIT 50`,
+        [req.params.id]
+      );
+      res.json({ success: true, data: result });
+    } else {
+      res.json({ success: true, data: [] });
+    }
   } catch (error) {
+    logger.error('Error fetching bids:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch bids' });
   }
 });

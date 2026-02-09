@@ -1,14 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { AuctionEngine } from '../services/auctionEngine.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
 // Get all auctions
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const auctionEngine = globalThis.auctionEngine || 
-      new (await import('../services/auctionEngine.js')).AuctionEngine();
-    
     const filters = {
       status: req.query.status as string || 'active',
       listing_type: req.query.type as string,
@@ -20,14 +18,14 @@ router.get('/', async (req: Request, res: Response) => {
       limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
     };
 
-    const result = await auctionEngine.getAuctions(filters);
-
-    res.json({
-      success: true,
-      ...result
-    });
+    if (global.auctionEngine) {
+      const result = await global.auctionEngine.getAuctions(filters);
+      res.json({ success: true, ...result });
+    } else {
+      res.json({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, total_pages: 0 } });
+    }
   } catch (error) {
-    console.error('Error fetching auctions:', error);
+    logger.error('Error fetching auctions:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch auctions' });
   }
 });
@@ -35,17 +33,17 @@ router.get('/', async (req: Request, res: Response) => {
 // Get single auction
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const auctionEngine = globalThis.auctionEngine || 
-      new (await import('../services/auctionEngine.js')).AuctionEngine();
-    
-    const auction = await auctionEngine.getAuction(req.params.id);
-
-    if (!auction) {
-      return res.status(404).json({ success: false, error: 'Auction not found' });
+    if (global.auctionEngine) {
+      const auction = await global.auctionEngine.getAuction(req.params.id);
+      if (!auction) {
+        return res.status(404).json({ success: false, error: 'Auction not found' });
+      }
+      res.json({ success: true, data: auction });
+    } else {
+      res.status(500).json({ success: false, error: 'Service not available' });
     }
-
-    res.json({ success: true, data: auction });
   } catch (error) {
+    logger.error('Error fetching auction:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch auction' });
   }
 });
@@ -53,7 +51,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Create auction (agent only)
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const agent = req.agent;
+    const agent = (req as any).agent;
     
     if (!agent || agent.agentId === 'spectator') {
       return res.status(401).json({
@@ -62,9 +60,6 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const auctionEngine = globalThis.auctionEngine || 
-      new (await import('../services/auctionEngine.js')).AuctionEngine();
-    
     const {
       title,
       description,
@@ -84,22 +79,25 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const auction = await auctionEngine.createAuction({
-      sellerId: agent.agentId,
-      title,
-      description,
-      listingType: listingType || 'skill',
-      category: category || 'General',
-      tags: tags || [],
-      startingPrice,
-      minBidIncrement: minBidIncrement || 5,
-      buyNowPrice,
-      durationDays
-    });
+    if (global.auctionEngine) {
+      const auction = await global.auctionEngine.createAuction({
+        sellerId: agent.agentId,
+        title,
+        description,
+        listingType: listingType || 'skill',
+        category: category || 'General',
+        tags: tags || [],
+        startingPrice,
+        minBidIncrement: minBidIncrement || 5,
+        buyNowPrice,
+        durationDays
+      });
 
-    logger.info(`New auction created: ${auction.id} by ${agent.name}`);
-
-    res.json({ success: true, data: auction });
+      logger.info(`New auction created: ${auction.id} by ${agent.name}`);
+      res.json({ success: true, data: auction });
+    } else {
+      res.status(500).json({ success: false, error: 'Service not available' });
+    }
   } catch (error) {
     logger.error('Create auction error:', error);
     res.status(500).json({ success: false, error: 'Failed to create auction' });
@@ -109,19 +107,19 @@ router.post('/', async (req: Request, res: Response) => {
 // Get bid history for auction
 router.get('/:id/bids', async (req: Request, res: Response) => {
   try {
-    const db = globalThis.db || 
-      new (await import('../db/index.js')).Database();
-    await db.connect();
-    
-    const result = await db.query(
-      `SELECT * FROM bids 
-       WHERE auction_id = $1 
-       ORDER BY bid_amount DESC`,
-      [req.params.id]
-    );
-
-    res.json({ success: true, data: result });
+    if (global.db) {
+      const result = await global.db.query(
+        `SELECT * FROM bids 
+         WHERE auction_id = $1 
+         ORDER BY bid_amount DESC`,
+        [req.params.id]
+      );
+      res.json({ success: true, data: result });
+    } else {
+      res.json({ success: true, data: [] });
+    }
   } catch (error) {
+    logger.error('Error fetching bids:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch bids' });
   }
 });

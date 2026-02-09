@@ -3,6 +3,10 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from '../utils/logger.js';
 import { AuctionEngine } from '../services/auctionEngine.js';
 
+interface ExtendedSocket extends Socket {
+  agentId?: string;
+}
+
 interface ConnectedClient {
   socketId: string;
   agentId?: string;
@@ -31,26 +35,24 @@ export class WebSocketManager {
   }
   
   private setupMiddleware() {
-    this.io.use(async (socket, next) => {
+    this.io.use(async (socket: ExtendedSocket, next) => {
       try {
         const agentId = socket.handshake.auth.agentId;
         const apiKey = socket.handshake.auth.apiKey;
         
         if (agentId && apiKey) {
-          // Agent connection - validate API key
-          // In production, validate against database
           socket.agentId = agentId;
         }
         
         next();
       } catch (error) {
-        next(error);
+        next(new Error('Authentication failed'));
       }
     });
   }
   
   private setupEventHandlers() {
-    this.io.on('connection', (socket) => {
+    this.io.on('connection', (socket: ExtendedSocket) => {
       const clientId = socket.id;
       
       this.clients.set(clientId, {
@@ -61,7 +63,7 @@ export class WebSocketManager {
       logger.info(`Client connected: ${clientId}`);
       
       // Handle agent joining auction room
-      socket.on('join_auction', async (data) => {
+      socket.on('join_auction', async (data: { auctionId: string }) => {
         const { auctionId } = data;
         
         if (!auctionId) {
@@ -89,59 +91,13 @@ export class WebSocketManager {
       });
       
       // Handle leaving auction
-      socket.on('leave_auction', (data) => {
+      socket.on('leave_auction', (data: { auctionId: string }) => {
         const { auctionId } = data;
         socket.leave(`auction:${auctionId}`);
         
         const client = this.clients.get(clientId);
         if (client) {
           client.joinedRooms.delete(auctionId);
-        }
-      });
-      
-      // Handle new bid (agent only)
-      socket.on('place_bid', async (data) => {
-        try {
-          const { auctionId, amount, agentId, maxBid } = data;
-          
-          // Validate and place bid
-          const auctionEngine = globalThis.auctionEngine || 
-            new (await import('../services/auctionEngine.js')).AuctionEngine();
-          
-          const result = await auctionEngine.placeBid({
-            auctionId,
-            bidderId: agentId,
-            bidAmount: amount,
-            isAutoBid: !!maxBid,
-            maxBidAmount: maxBid,
-          });
-          
-          if (result.success) {
-            // Broadcast new bid to all in room
-            this.io.to(`auction:${auctionId}`).emit('bid_placed', {
-              auctionId,
-              bid: result.bid,
-              newPrice: result.newPrice,
-              bidCount: result.bidCount,
-            });
-            
-            // Send confirmation to bidder
-            socket.emit('bid_confirmed', {
-              auctionId,
-              bid: result.bid,
-              newPrice: result.newPrice,
-            });
-            
-            logger.info(`Bid placed on auction ${auctionId}: ${amount} by agent ${agentId}`);
-          } else {
-            socket.emit('bid_rejected', {
-              auctionId,
-              reason: result.error,
-            });
-          }
-        } catch (error) {
-          logger.error('Bid error:', error);
-          socket.emit('bid_error', { message: 'Failed to place bid' });
         }
       });
       
@@ -159,14 +115,11 @@ export class WebSocketManager {
   }
   
   private async checkAuctionEndings() {
-    const auctionEngine = globalThis.auctionEngine || 
-      new (await import('../services/auctionEngine.js')).AuctionEngine();
+    if (!global.auctionEngine) return;
     
-    // Check for ended auctions
-    const endedAuctions = await auctionEngine.checkEndedAuctions();
+    const endedAuctions = await global.auctionEngine.checkEndedAuctions();
     
     for (const auction of endedAuctions) {
-      // Notify all clients in room
       this.io.to(`auction:${auction.id}`).emit('auction_ended', {
         auctionId: auction.id,
         winnerId: auction.winnerId,
@@ -177,17 +130,14 @@ export class WebSocketManager {
     }
   }
   
-  // Public method to broadcast to auction room
   broadcastToAuction(auctionId: string, event: string, data: any) {
     this.io.to(`auction:${auctionId}`).emit(event, data);
   }
   
-  // Get connected clients count
   getClientCount(): number {
     return this.clients.size;
   }
   
-  // Get auction spectator count
   getAuctionSpectators(auctionId: string): number {
     return this.getRoomCount(`auction:${auctionId}`);
   }
