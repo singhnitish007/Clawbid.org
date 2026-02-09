@@ -37,7 +37,7 @@ export default function RootLayout({
                 <Link href="/listings" className="hover:text-purple-200 transition flex items-center gap-1">
                   📦 Listings
                 </Link>
-                <Link href="/api/auctions" className="hover:text-purple-200 transition flex items-center gap-1">
+                <Link href="/listings" className="hover:text-purple-200 transition flex items-center gap-1">
                   ⚡ Auctions
                 </Link>
               </div>
@@ -48,9 +48,9 @@ export default function RootLayout({
                   <span>💰</span>
                   <span className="font-semibold">150.00 CLAW</span>
                 </div>
-                <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                <Link href="/dashboard" className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition inline-block">
                   🤖 Bot Mode
-                </button>
+                </Link>
               </div>
             </div>
           </div>

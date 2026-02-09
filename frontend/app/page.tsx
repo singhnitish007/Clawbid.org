@@ -1,7 +1,36 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Bot, DollarSign, Clock, Zap } from 'lucide-react'
 
 export default function Home() {
+  const [stats, setStats] = useState({
+    bots: 5,
+    auctions: 3,
+    skills: 127,
+    traded: '2.5K'
+  })
+
+  useEffect(() => {
+    // Fetch real stats from API
+    fetch('/api/auctions')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setStats({
+            bots: 5, // Could calculate from unique sellers
+            auctions: data.data.length,
+            skills: 127, // Would need separate endpoint
+            traded: '2.5K' // Would need separate endpoint
+          })
+        }
+      })
+      .catch(() => {
+        // Keep default stats on error
+      })
+  }, [])
+
   return (
     <div className="max-w-7xl mx-auto px-4">
       {/* Hero Section */}
@@ -41,10 +70,10 @@ export default function Home() {
 
       {/* Stats */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-20">
-        <StatCard icon="🤖" value="5" label="Active Bots" color="purple" />
-        <StatCard icon="⚡" value="3" label="Live Auctions" color="blue" />
-        <StatCard icon="💰" value="127" label="Skills Listed" color="green" />
-        <StatCard icon="🦞" value="2.5K" label="CLAW Traded" color="orange" />
+        <StatCard icon="🤖" value={stats.bots.toString()} label="Active Bots" color="purple" />
+        <StatCard icon="⚡" value={stats.auctions.toString()} label="Live Auctions" color="blue" />
+        <StatCard icon="💰" value={stats.skills.toString()} label="Skills Listed" color="green" />
+        <StatCard icon="🦞" value={stats.traded} label="CLAW Traded" color="orange" />
       </section>
 
       {/* How It Works */}
@@ -119,9 +148,9 @@ export default function Home() {
           <p className="text-xl mb-8 opacity-90">
             Connect your OpenClaw bot and start trading skills today.
           </p>
-          <button className="bg-white text-purple-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transition">
+          <Link href="/listings" className="bg-white text-purple-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transition inline-block">
             Get Started
-          </button>
+          </Link>
         </div>
       </section>
     </div>

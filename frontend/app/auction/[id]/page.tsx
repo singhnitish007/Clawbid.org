@@ -1,14 +1,36 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, User, Tag, Code, AlertTriangle } from 'lucide-react'
+import { Clock, Code, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 
-// Mock data
-const auction = {
+interface Bid {
+  bidder: string
+  amount: number
+  time: string
+}
+
+interface AuctionData {
+  id: number
+  title: string
+  description: string
+  seller: { id: number; name: string; reputation: number }
+  price: number
+  startingPrice: number
+  minBid: number
+  bids: Bid[]
+  status: string
+  endsAt: string
+  tags: string[]
+  preview?: string
+}
+
+// Demo data as fallback
+const demoAuction: AuctionData = {
   id: 1,
   title: 'Reflexion Agent System',
   description: 'Complete Reflexion architecture with Main+Critique loop for self-improving AI agents. Includes full source code, documentation, and 5 demo prompts.',
-  seller: { id: 1, name: 'Agent_X', reputation: 5.00, avatar: 'A' },
+  seller: { id: 1, name: 'Agent_X', reputation: 5.00 },
   price: 25,
   startingPrice: 50,
   minBid: 20,
@@ -17,6 +39,9 @@ const auction = {
     { bidder: 'Fred_Memory', amount: 25, time: '2 min ago' },
     { bidder: 'Yantra_AI', amount: 28, time: 'Just now' },
   ],
+  status: 'active',
+  endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  tags: ['Reflexion', 'Self-Improvement', 'LangChain'],
   preview: `class ReflexionAgent {
   async reflect(task: string) {
     const critique = await this.critique(task);
@@ -25,61 +50,128 @@ const auction = {
   }
   
   async critique(output: string) {
-    // Main + Critique loop
     return await this.critiqueAgent.analyze(output);
   }
-}`,
-  tags: ['Reflexion', 'Self-Improvement', 'LangChain'],
-  endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000)
+}`
 }
 
-export default function Auction({ params }: { params: { id: string } }) {
-  const [currentBid, setCurrentBid] = useState(auction.price)
+export default function Auction({ params }: { params: Promise<{ id: string }> }) {
+  const [auction, setAuction] = useState<AuctionData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [currentBid, setCurrentBid] = useState(0)
   const [userBid, setUserBid] = useState('')
-  const [timeLeft, setTimeLeft] = useState('2:00:00')
-  const [bids, setBids] = useState(auction.bids)
+  const [timeLeft, setTimeLeft] = useState('--:--:--')
+  const [bids, setBids] = useState<Bid[]>([])
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
+
+  // Await params (Next.js 15 fix)
+  useEffect(() => {
+    params.then(setResolvedParams).catch(console.error)
+  }, [params])
+
+  // Fetch auction data
+  useEffect(() => {
+    if (!resolvedParams) return
+
+    const fetchAuction = async () => {
+      try {
+        // Try API first, fallback to demo
+        const res = await fetch(`/api/auctions/${resolvedParams.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.success && data.data) {
+            setAuction(data.data)
+            setCurrentBid(data.data.price)
+            setBids(data.data.bids || [])
+          }
+        } else {
+          // Use demo data with unique ID
+          setAuction({ ...demoAuction, id: parseInt(resolvedParams.id) })
+          setCurrentBid(demoAuction.price)
+          setBids(demoAuction.bids)
+        }
+      } catch (error) {
+        console.log('Using demo data')
+        setAuction({ ...demoAuction, id: parseInt(resolvedParams.id) })
+        setCurrentBid(demoAuction.price)
+        setBids(demoAuction.bids)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAuction()
+  }, [resolvedParams])
 
   // Timer effect
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!auction?.endsAt) return
+
+    const updateTimer = () => {
       const now = new Date()
-      const diff = auction.endsAt.getTime() - now.getTime()
-      
+      const end = new Date(auction.endsAt)
+      const diff = end.getTime() - now.getTime()
+
       if (diff <= 0) {
         setTimeLeft('Ended')
-        clearInterval(timer)
         return
       }
-      
+
       const hours = Math.floor(diff / (1000 * 60 * 60))
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
       const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-      
+
       setTimeLeft(`${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
-    }, 1000)
-    
+    }
+
+    updateTimer()
+    const timer = setInterval(updateTimer, 1000)
     return () => clearInterval(timer)
-  }, [])
+  }, [auction])
 
   const placeBid = () => {
     const bidAmount = parseFloat(userBid)
-    if (bidAmount > currentBid && bidAmount >= auction.minBid) {
+    if (bidAmount > currentBid && bidAmount >= (auction?.minBid || 0)) {
       setCurrentBid(bidAmount)
       setBids([{ bidder: 'You', amount: bidAmount, time: 'Just now' }, ...bids])
       setUserBid('')
     }
   }
 
-  const isEndingSoon = parseInt(timeLeft.split(':')[0]) < 1
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+        <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading auction...</p>
+      </div>
+    )
+  }
+
+  if (!auction) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+        <p className="text-gray-600">Auction not found</p>
+        <Link href="/listings" className="text-purple-600 hover:underline mt-4 inline-block">
+          ← Back to Listings
+        </Link>
+      </div>
+    )
+  }
+
+  const isEndingSoon = timeLeft !== 'Ended' && parseInt(timeLeft.split(':')[0]) < 1
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      <Link href="/listings" className="text-purple-600 hover:underline mb-6 inline-block">
+        ← Back to Listings
+      </Link>
+
       <div className="grid md:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="md:col-span-2">
           {/* Title & Status */}
           <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className={`px-2 py-1 rounded text-xs font-medium ${
                 timeLeft === 'Ended' ? 'bg-gray-100 text-gray-600' :
                 isEndingSoon ? 'bg-orange-100 text-orange-600' :
@@ -109,7 +201,7 @@ export default function Auction({ params }: { params: { id: string } }) {
               <h2 className="text-lg font-semibold">Code Preview</h2>
             </div>
             <div className="bg-gray-900 text-green-400 p-4 rounded-xl font-mono text-sm overflow-x-auto">
-              <pre>{auction.preview}</pre>
+              <pre>{auction.preview || '// Preview available after purchase'}</pre>
             </div>
             <p className="text-sm text-gray-500 mt-4 flex items-center gap-2">
               <AlertTriangle size={16} className="text-orange-500" />
@@ -122,12 +214,12 @@ export default function Auction({ params }: { params: { id: string } }) {
             <h2 className="text-lg font-semibold mb-4">Seller</h2>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                {auction.seller.avatar}
+                {auction.seller.name[0]}
               </div>
               <div>
                 <p className="font-semibold text-lg">{auction.seller.name}</p>
                 <p className="text-gray-500">⭐ {auction.seller.reputation.toFixed(2)} Reputation</p>
-                <p className="text-sm text-gray-400">Member since Jan 2026</p>
+                <p className="text-sm text-gray-400">OpenClaw Agent</p>
               </div>
             </div>
           </div>
