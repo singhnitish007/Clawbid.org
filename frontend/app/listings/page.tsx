@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Search, Filter, Clock, User, Sparkles, Grid, List } from 'lucide-react'
+import { Search, Filter, Clock, User, Sparkles, Grid, List, ArrowRight } from 'lucide-react'
 
 interface Seller {
   id: number
@@ -24,7 +24,8 @@ interface Listing {
   tags: string[]
 }
 
-const demoListings: Listing[] = [
+// Static demo data with fixed end times (will be calculated client-side)
+const demoListingsBase = [
   {
     id: 1,
     title: 'Reflexion Agent System',
@@ -35,7 +36,8 @@ const demoListings: Listing[] = [
     minBid: 20,
     bids: 5,
     status: 'active',
-    endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    // Time will be set client-side
+    offsetMs: 2 * 60 * 60 * 1000, // 2 hours from now
     tags: ['Reflexion', 'Self-Improvement', 'LangChain']
   },
   {
@@ -48,7 +50,7 @@ const demoListings: Listing[] = [
     minBid: 30,
     bids: 8,
     status: 'active',
-    endsAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    offsetMs: 45 * 60 * 1000, // 45 minutes from now
     tags: ['LangGraph', 'Orchestration', 'Multi-Agent']
   },
   {
@@ -61,7 +63,7 @@ const demoListings: Listing[] = [
     minBid: 10,
     bids: 3,
     status: 'ended',
-    endsAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    offsetMs: -10 * 60 * 1000, // 10 minutes ago
     tags: ['Memory', 'Dataset', 'Training']
   },
 ]
@@ -100,13 +102,34 @@ const filters = [
 ]
 
 export default function Listings() {
+  const [mounted, setMounted] = useState(false)
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('All')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [now, setNow] = useState(new Date())
 
+  // Wait for mount
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Update timer
+  useEffect(() => {
+    if (!mounted) return
+
+    const timer = setInterval(() => {
+      setNow(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [mounted])
+
+  // Fetch listings
+  useEffect(() => {
+    if (!mounted) return
+
     const fetchListings = async () => {
       try {
         const res = await fetch('/api/auctions')
@@ -115,40 +138,62 @@ export default function Listings() {
           if (data.success && data.data && data.data.length > 0) {
             setListings(data.data)
           } else {
-            setListings(demoListings)
+            // Use demo data with client-side calculated times
+            setListings(demoListingsBase.map(item => ({
+              ...item,
+              endsAt: new Date(Date.now() + item.offsetMs).toISOString()
+            })))
           }
         } else {
-          setListings(demoListings)
+          setListings(demoListingsBase.map(item => ({
+            ...item,
+            endsAt: new Date(Date.now() + item.offsetMs).toISOString()
+          })))
         }
       } catch {
-        setListings(demoListings)
+        setListings(demoListingsBase.map(item => ({
+          ...item,
+          endsAt: new Date(Date.now() + item.offsetMs).toISOString()
+        })))
       } finally {
         setLoading(false)
       }
     }
 
     fetchListings()
-  }, [])
+  }, [mounted])
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setListings(prev => [...prev])
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
+  // Calculate dynamic status and time for each listing
+  const processedListings = useMemo(() => {
+    return listings.map(listing => ({
+      ...listing,
+      status: mounted ? getStatus(listing.endsAt) : 'active',
+      timeLeft: mounted ? formatTimeLeft(listing.endsAt) : 'Loading...'
+    }))
+  }, [listings, mounted])
 
-  const filteredListings = listings.filter(listing => {
+  const filteredListings = processedListings.filter(listing => {
     if (searchQuery && !listing.title.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false
     }
 
-    const status = getStatus(listing.endsAt)
-    if (activeFilter === 'Active' && status !== 'active') return false
-    if (activeFilter === 'Ending Soon' && status !== 'ending') return false
-    if (activeFilter === 'Ended' && status !== 'ended') return false
+    if (activeFilter === 'Active' && listing.status !== 'active') return false
+    if (activeFilter === 'Ending Soon' && listing.status !== 'ending') return false
+    if (activeFilter === 'Ended' && listing.status !== 'ended') return false
 
     return true
   })
+
+  if (!mounted) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+        <div className="inline-flex items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full"></div>
+          <span className="text-gray-600">Loading marketplace...</span>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -251,11 +296,9 @@ export default function Listings() {
   )
 }
 
-function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid' | 'list' }) {
-  const status = getStatus(listing.endsAt)
-  const timeLeft = formatTimeLeft(listing.endsAt)
-  const isEndingSoon = status === 'ending'
-  const isEnded = status === 'ended'
+function ListingCard({ listing, viewMode }: { listing: Listing & { status: string; timeLeft: string }; viewMode: 'grid' | 'list' }) {
+  const isEndingSoon = listing.status === 'ending'
+  const isEnded = listing.status === 'ended'
 
   if (viewMode === 'list') {
     return (
@@ -263,8 +306,8 @@ function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid'
         <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover flex items-center gap-6">
           {/* Status Badge */}
           <div className={`shrink-0 w-2 h-20 rounded-full ${
-            status === 'active' ? 'bg-green-500' :
-            status === 'ending' ? 'bg-orange-500' :
+            listing.status === 'active' ? 'bg-green-500' :
+            listing.status === 'ending' ? 'bg-orange-500' :
             'bg-gray-400'
           }`} />
 
@@ -273,11 +316,11 @@ function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid'
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-lg text-gray-800 truncate">{listing.title}</h3>
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                status === 'active' ? 'bg-green-100 text-green-700' :
-                status === 'ending' ? 'bg-orange-100 text-orange-700' :
+                listing.status === 'active' ? 'bg-green-100 text-green-700' :
+                listing.status === 'ending' ? 'bg-orange-100 text-orange-700' :
                 'bg-gray-100 text-gray-600'
               }`}>
-                {status === 'active' ? '🟢 Active' : status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+                {listing.status === 'active' ? '🟢 Active' : listing.status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
               </span>
             </div>
             <p className="text-gray-500 text-sm line-clamp-1">{listing.description}</p>
@@ -298,7 +341,7 @@ function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid'
               isEndingSoon ? 'text-orange-500 timer-pulse' :
               isEnded ? 'text-gray-400' : 'text-gray-600'
             }`}>
-              {timeLeft}
+              {listing.timeLeft}
             </p>
           </div>
         </div>
@@ -308,20 +351,20 @@ function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid'
 
   return (
     <Link href={`/auction/${listing.id}`}>
-      <div className={`bg-white rounded-2xl border-2 overflow-hidden card-hover ${
-        status === 'active' ? 'border-green-200 hover:border-green-400' :
-        status === 'ending' ? 'border-orange-300 hover:border-orange-500' :
+      <div className={`bg-white rounded-2xl border-2 overflow-hidden card-hover cursor-pointer ${
+        listing.status === 'active' ? 'border-green-200 hover:border-green-400' :
+        listing.status === 'ending' ? 'border-orange-300 hover:border-orange-500' :
         'border-gray-200 hover:border-gray-400'
       }`}>
         {/* Card Header */}
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
             <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-              status === 'active' ? 'bg-green-100 text-green-700' :
-              status === 'ending' ? 'bg-orange-100 text-orange-700' :
+              listing.status === 'active' ? 'bg-green-100 text-green-700' :
+              listing.status === 'ending' ? 'bg-orange-100 text-orange-700' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {status === 'active' ? '🟢 Active' : status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+              {listing.status === 'active' ? '🟢 Active' : listing.status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
             </span>
             <span className="text-sm text-gray-500 flex items-center gap-1">
               <User size={14} />
@@ -350,13 +393,13 @@ function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid'
             <div className="text-right">
               <p className="text-sm text-gray-500 flex items-center gap-1 justify-end">
                 <Clock size={14} />
-                {status === 'ended' ? '' : 'Left'}
+                {listing.status === 'ended' ? '' : 'Left'}
               </p>
               <p className={`font-semibold ${
                 isEndingSoon ? 'text-orange-500 timer-pulse' :
                 isEnded ? 'text-gray-400' : 'text-gray-700'
               }`}>
-                {timeLeft}
+                {listing.timeLeft}
               </p>
             </div>
           </div>

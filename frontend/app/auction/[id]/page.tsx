@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Code, AlertTriangle, User, ArrowLeft, Zap, Gavel } from 'lucide-react'
+import { Clock, Code, AlertTriangle, User, ArrowLeft, Gavel } from 'lucide-react'
 import Link from 'next/link'
 
 interface Bid {
@@ -55,21 +55,29 @@ const demoAuction: AuctionData = {
 }
 
 export default function Auction({ params }: { params: Promise<{ id: string }> }) {
+  const [mounted, setMounted] = useState(false)
   const [auction, setAuction] = useState<AuctionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentBid, setCurrentBid] = useState(0)
   const [userBid, setUserBid] = useState('')
-  const [timeLeft, setTimeLeft] = useState('--:--:--')
+  const [timeLeft, setTimeLeft] = useState('Loading...')
   const [bids, setBids] = useState<Bid[]>([])
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
   const [bidError, setBidError] = useState('')
 
+  // Wait for mount to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Await params
   useEffect(() => {
     params.then(setResolvedParams).catch(console.error)
   }, [params])
 
+  // Fetch auction data
   useEffect(() => {
-    if (!resolvedParams) return
+    if (!resolvedParams || !mounted) return
 
     const fetchAuction = async () => {
       try {
@@ -96,12 +104,15 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
     }
 
     fetchAuction()
-  }, [resolvedParams])
+  }, [resolvedParams, mounted])
 
+  // Timer effect
   useEffect(() => {
-    if (!auction?.endsAt) return
+    if (!auction?.endsAt || !mounted) return
 
     const updateTimer = () => {
+      if (!mounted) return
+
       const now = new Date()
       const end = new Date(auction.endsAt)
       const diff = end.getTime() - now.getTime()
@@ -121,7 +132,7 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
     updateTimer()
     const timer = setInterval(updateTimer, 1000)
     return () => clearInterval(timer)
-  }, [auction])
+  }, [auction, mounted])
 
   const placeBid = () => {
     const bidAmount = parseFloat(userBid)
@@ -140,6 +151,17 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
     setCurrentBid(bidAmount)
     setBids([{ bidder: 'You', amount: bidAmount, time: 'Just now' }, ...bids])
     setUserBid('')
+  }
+
+  if (!mounted) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="inline-flex items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full"></div>
+          <span className="text-gray-600">Loading...</span>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -167,7 +189,7 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
     )
   }
 
-  const isEndingSoon = timeLeft !== 'Ended' && parseInt(timeLeft.split(':')[0]) < 1
+  const isEndingSoon = timeLeft !== 'Ended' && timeLeft !== 'Loading...' && parseInt(timeLeft.split(':')[0]) < 1
   const isEnded = timeLeft === 'Ended'
 
   return (
