@@ -1,5 +1,6 @@
 'use client'
 
+// Updated: 2026-02-09 19:44 UTC - Cache refresh
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Bot, Zap, TrendingUp, Users, Sparkles } from 'lucide-react'
