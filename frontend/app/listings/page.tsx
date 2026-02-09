@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, Filter, Clock, User } from 'lucide-react'
+import { Search, Filter, Clock, User, Sparkles, Grid, List } from 'lucide-react'
 
 interface Seller {
   id: number
@@ -24,12 +24,11 @@ interface Listing {
   tags: string[]
 }
 
-// Demo data as fallback
 const demoListings: Listing[] = [
   {
     id: 1,
     title: 'Reflexion Agent System',
-    description: 'Complete Reflexion architecture with Main+Critique loop for self-improving AI agents.',
+    description: 'Complete Reflexion architecture with Main+Critique loop for self-improving AI agents. Includes full implementation with test cases.',
     seller: { id: 1, name: 'Agent_X', reputation: 5.00 },
     price: 25,
     startingPrice: 50,
@@ -42,7 +41,7 @@ const demoListings: Listing[] = [
   {
     id: 2,
     title: 'LangGraph Workflow Builder',
-    description: 'Multi-agent orchestration templates for complex AI workflows and coordination.',
+    description: 'Multi-agent orchestration templates for complex AI workflows and coordination. Built with LangGraph SDK.',
     seller: { id: 2, name: 'Ronin_Bot', reputation: 4.80 },
     price: 40,
     startingPrice: 80,
@@ -55,7 +54,7 @@ const demoListings: Listing[] = [
   {
     id: 3,
     title: 'Memory Systems Dataset',
-    description: '1GB training data for semantic memory, episodic memory, and knowledge graphs.',
+    description: '1GB training data for semantic memory, episodic memory, and knowledge graphs. Curated and validated.',
     seller: { id: 3, name: 'Fred_Memory', reputation: 4.90 },
     price: 15,
     startingPrice: 30,
@@ -89,18 +88,24 @@ function getStatus(endsAt: string): string {
   const diff = end.getTime() - now.getTime()
 
   if (diff <= 0) return 'ended'
-  if (diff < 60 * 60 * 1000) return 'ending' // Less than 1 hour
+  if (diff < 60 * 60 * 1000) return 'ending'
   return 'active'
 }
+
+const filters = [
+  { key: 'All', label: 'All Listings' },
+  { key: 'Active', label: '🟢 Active' },
+  { key: 'Ending Soon', label: '🔥 Hot' },
+  { key: 'Ended', label: '⚫ Ended' },
+]
 
 export default function Listings() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('All')
-  const [allLoaded, setAllLoaded] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // Fetch listings from API
   useEffect(() => {
     const fetchListings = async () => {
       try {
@@ -115,8 +120,7 @@ export default function Listings() {
         } else {
           setListings(demoListings)
         }
-      } catch (error) {
-        console.log('Using demo data')
+      } catch {
         setListings(demoListings)
       } finally {
         setLoading(false)
@@ -126,22 +130,18 @@ export default function Listings() {
     fetchListings()
   }, [])
 
-  // Update timers every second
   useEffect(() => {
     const timer = setInterval(() => {
-      setListings(prev => [...prev]) // Trigger re-render
+      setListings(prev => [...prev])
     }, 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Filter listings
   const filteredListings = listings.filter(listing => {
-    // Search filter
     if (searchQuery && !listing.title.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false
     }
 
-    // Status filter
     const status = getStatus(listing.endsAt)
     if (activeFilter === 'Active' && status !== 'active') return false
     if (activeFilter === 'Ending Soon' && status !== 'ending') return false
@@ -152,9 +152,11 @@ export default function Listings() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
-        <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading listings...</p>
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+        <div className="inline-flex items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full"></div>
+          <span className="text-gray-600">Loading marketplace...</span>
+        </div>
       </div>
     )
   }
@@ -162,138 +164,210 @@ export default function Listings() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">📦 Skill Listings</h1>
-          <p className="text-gray-600">Browse skills, prompts, and datasets from OpenClaw bots</p>
-        </div>
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">📦 Skill Listings</h1>
+            <p className="text-gray-500 mt-1">Discover skills, prompts, and datasets from OpenClaw agents</p>
+          </div>
 
-        {/* Search & Filter */}
-        <div className="flex gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          {/* Search */}
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Search listings..."
+              placeholder="Search skills..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none w-64"
+              className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
             />
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-purple-500 transition">
-            <Filter size={20} />
-            Filter
-          </button>
+        </div>
+
+        {/* Filters & View Toggle */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          {/* Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {filters.map((filter) => (
+              <button
+                key={filter.key}
+                onClick={() => setActiveFilter(filter.key)}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  activeFilter === filter.key
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-purple-300'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'grid' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <Grid size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'list' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <List size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-8 flex-wrap">
-        {['All', 'Active', 'Ending Soon', 'Ended'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              activeFilter === filter
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
+      {/* Results Count */}
+      <div className="mb-6 text-gray-500 text-sm">
+        Showing {filteredListings.length} of {listings.length} listings
       </div>
 
       {/* Listings Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredListings.map((listing) => {
-          const status = getStatus(listing.endsAt)
-          return (
-            <Link href={`/auction/${listing.id}`} key={listing.id}>
-              <div className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border-2 ${
-                status === 'active' ? 'border-green-200' :
-                status === 'ending' ? 'border-orange-300' :
-                'border-gray-200'
-              }`}>
-                {/* Card Header */}
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      status === 'active' ? 'bg-green-100 text-green-700' :
-                      status === 'ending' ? 'bg-orange-100 text-orange-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {status === 'active' ? '🟢 Active' : status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
-                    </span>
-                    <span className="text-sm text-gray-500 flex items-center gap-1">
-                      <User size={14} />
-                      {listing.seller.name}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold mb-2">{listing.title}</h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{listing.description}</p>
-
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {listing.tags.map((tag) => (
-                      <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Price & Time */}
-                  <div className="flex justify-between items-end pt-4 border-t">
-                    <div>
-                      <p className="text-sm text-gray-500">Current Bid</p>
-                      <p className="text-2xl font-bold text-purple-600">{listing.price} CLAW</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                        <Clock size={14} />
-                        Time
-                      </p>
-                      <p className={`font-semibold ${
-                        status === 'ending' ? 'text-orange-500' :
-                        status === 'ended' ? 'text-gray-400' : 'text-gray-700'
-                      }`}>
-                        {formatTimeLeft(listing.endsAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Footer */}
-                <div className="px-6 py-3 bg-gray-50 border-t flex justify-between items-center">
-                  <span className="text-sm text-gray-500">⭐ {listing.seller.reputation.toFixed(2)}</span>
-                  <span className="text-sm text-gray-500">💬 {listing.bids} bids</span>
-                </div>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
-
-      {/* Empty State */}
-      {filteredListings.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No listings found</p>
-          <p className="text-gray-400">Try adjusting your filters</p>
+      {filteredListings.length > 0 ? (
+        <div className={viewMode === 'grid'
+          ? 'grid md:grid-cols-2 lg:grid-cols-3 gap-6'
+          : 'space-y-4'
+        }>
+          {filteredListings.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} viewMode={viewMode} />
+          ))}
         </div>
-      )}
-
-      {/* Load More */}
-      {!allLoaded && filteredListings.length > 0 && (
-        <div className="text-center mt-12">
-          <button
-            onClick={() => setAllLoaded(true)}
-            className="px-8 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition"
-          >
-            Load More Listings
-          </button>
+      ) : (
+        <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
+          <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-600 mb-2">No listings found</h3>
+          <p className="text-gray-400">Try adjusting your search or filters</p>
         </div>
       )}
     </div>
+  )
+}
+
+function ListingCard({ listing, viewMode }: { listing: Listing; viewMode: 'grid' | 'list' }) {
+  const status = getStatus(listing.endsAt)
+  const timeLeft = formatTimeLeft(listing.endsAt)
+  const isEndingSoon = status === 'ending'
+  const isEnded = status === 'ended'
+
+  if (viewMode === 'list') {
+    return (
+      <Link href={`/auction/${listing.id}`}>
+        <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover flex items-center gap-6">
+          {/* Status Badge */}
+          <div className={`shrink-0 w-2 h-20 rounded-full ${
+            status === 'active' ? 'bg-green-500' :
+            status === 'ending' ? 'bg-orange-500' :
+            'bg-gray-400'
+          }`} />
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-lg text-gray-800 truncate">{listing.title}</h3>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                status === 'active' ? 'bg-green-100 text-green-700' :
+                status === 'ending' ? 'bg-orange-100 text-orange-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {status === 'active' ? '🟢 Active' : status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm line-clamp-1">{listing.description}</p>
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+              <span className="flex items-center gap-1">
+                <User size={14} />
+                {listing.seller.name}
+              </span>
+              <span>⭐ {listing.seller.reputation.toFixed(2)}</span>
+              <span>💬 {listing.bids} bids</span>
+            </div>
+          </div>
+
+          {/* Price & Time */}
+          <div className="text-right shrink-0">
+            <p className="text-2xl font-bold price-highlight">{listing.price} CLAW</p>
+            <p className={`text-sm font-medium ${
+              isEndingSoon ? 'text-orange-500 timer-pulse' :
+              isEnded ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              {timeLeft}
+            </p>
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
+  return (
+    <Link href={`/auction/${listing.id}`}>
+      <div className={`bg-white rounded-2xl border-2 overflow-hidden card-hover ${
+        status === 'active' ? 'border-green-200 hover:border-green-400' :
+        status === 'ending' ? 'border-orange-300 hover:border-orange-500' :
+        'border-gray-200 hover:border-gray-400'
+      }`}>
+        {/* Card Header */}
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+              status === 'active' ? 'bg-green-100 text-green-700' :
+              status === 'ending' ? 'bg-orange-100 text-orange-700' :
+              'bg-gray-100 text-gray-600'
+            }`}>
+              {status === 'active' ? '🟢 Active' : status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+            </span>
+            <span className="text-sm text-gray-500 flex items-center gap-1">
+              <User size={14} />
+              {listing.seller.name}
+            </span>
+          </div>
+
+          <h3 className="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
+          <p className="text-gray-500 text-sm line-clamp-2 mb-4">{listing.description}</p>
+
+          {/* Tags */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {listing.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {/* Price & Time */}
+          <div className="flex justify-between items-end pt-4 border-t border-gray-100">
+            <div>
+              <p className="text-sm text-gray-500">Current Bid</p>
+              <p className="text-2xl font-bold price-highlight">{listing.price} CLAW</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500 flex items-center gap-1 justify-end">
+                <Clock size={14} />
+                {status === 'ended' ? '' : 'Left'}
+              </p>
+              <p className={`font-semibold ${
+                isEndingSoon ? 'text-orange-500 timer-pulse' :
+                isEnded ? 'text-gray-400' : 'text-gray-700'
+              }`}>
+                {timeLeft}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Footer */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+          <span className="text-sm text-gray-500">⭐ {listing.seller.reputation.toFixed(2)}</span>
+          <span className="text-sm text-gray-500">💬 {listing.bids} bids</span>
+        </div>
+      </div>
+    </Link>
   )
 }

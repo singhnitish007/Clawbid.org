@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Code, AlertTriangle } from 'lucide-react'
+import { Clock, Code, AlertTriangle, User, ArrowLeft, Zap, Gavel } from 'lucide-react'
 import Link from 'next/link'
 
 interface Bid {
@@ -25,11 +25,10 @@ interface AuctionData {
   preview?: string
 }
 
-// Demo data as fallback
 const demoAuction: AuctionData = {
   id: 1,
   title: 'Reflexion Agent System',
-  description: 'Complete Reflexion architecture with Main+Critique loop for self-improving AI agents. Includes full source code, documentation, and 5 demo prompts.',
+  description: 'Complete Reflexion architecture with Main+Critique loop for self-improving AI agents. Includes full source code, documentation, and 5 demo prompts. This implementation follows the paper\'s methodology with practical optimizations for production use.',
   seller: { id: 1, name: 'Agent_X', reputation: 5.00 },
   price: 25,
   startingPrice: 50,
@@ -48,7 +47,7 @@ const demoAuction: AuctionData = {
     const revision = await this.revise(critique);
     return this.execute(revision);
   }
-  
+
   async critique(output: string) {
     return await this.critiqueAgent.analyze(output);
   }
@@ -63,19 +62,17 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
   const [timeLeft, setTimeLeft] = useState('--:--:--')
   const [bids, setBids] = useState<Bid[]>([])
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
+  const [bidError, setBidError] = useState('')
 
-  // Await params (Next.js 15 fix)
   useEffect(() => {
     params.then(setResolvedParams).catch(console.error)
   }, [params])
 
-  // Fetch auction data
   useEffect(() => {
     if (!resolvedParams) return
 
     const fetchAuction = async () => {
       try {
-        // Try API first, fallback to demo
         const res = await fetch(`/api/auctions/${resolvedParams.id}`)
         if (res.ok) {
           const data = await res.json()
@@ -85,13 +82,11 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
             setBids(data.data.bids || [])
           }
         } else {
-          // Use demo data with unique ID
           setAuction({ ...demoAuction, id: parseInt(resolvedParams.id) })
           setCurrentBid(demoAuction.price)
           setBids(demoAuction.bids)
         }
-      } catch (error) {
-        console.log('Using demo data')
+      } catch {
         setAuction({ ...demoAuction, id: parseInt(resolvedParams.id) })
         setCurrentBid(demoAuction.price)
         setBids(demoAuction.bids)
@@ -103,7 +98,6 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
     fetchAuction()
   }, [resolvedParams])
 
-  // Timer effect
   useEffect(() => {
     if (!auction?.endsAt) return
 
@@ -131,53 +125,71 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
 
   const placeBid = () => {
     const bidAmount = parseFloat(userBid)
-    if (bidAmount > currentBid && bidAmount >= (auction?.minBid || 0)) {
-      setCurrentBid(bidAmount)
-      setBids([{ bidder: 'You', amount: bidAmount, time: 'Just now' }, ...bids])
-      setUserBid('')
+
+    if (!bidAmount || bidAmount < (auction?.minBid || 0)) {
+      setBidError(`Minimum bid is ${auction?.minBid} CLAW`)
+      return
     }
+
+    if (bidAmount <= currentBid) {
+      setBidError('Bid must be higher than current price')
+      return
+    }
+
+    setBidError('')
+    setCurrentBid(bidAmount)
+    setBids([{ bidder: 'You', amount: bidAmount, time: 'Just now' }, ...bids])
+    setUserBid('')
   }
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
-        <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading auction...</p>
+      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="inline-flex items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full"></div>
+          <span className="text-gray-600">Loading auction...</span>
+        </div>
       </div>
     )
   }
 
   if (!auction) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
-        <p className="text-gray-600">Auction not found</p>
-        <Link href="/listings" className="text-purple-600 hover:underline mt-4 inline-block">
-          ← Back to Listings
-        </Link>
+      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-2xl p-8 border border-gray-200 max-w-md mx-auto">
+          <p className="text-gray-600 text-lg mb-4">Auction not found</p>
+          <Link href="/listings" className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium">
+            <ArrowLeft size={18} />
+            Back to Listings
+          </Link>
+        </div>
       </div>
     )
   }
 
   const isEndingSoon = timeLeft !== 'Ended' && parseInt(timeLeft.split(':')[0]) < 1
+  const isEnded = timeLeft === 'Ended'
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <Link href="/listings" className="text-purple-600 hover:underline mb-6 inline-block">
-        ← Back to Listings
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Back Link */}
+      <Link href="/listings" className="inline-flex items-center gap-2 text-gray-500 hover:text-purple-600 mb-6 transition-colors">
+        <ArrowLeft size={18} />
+        Back to Listings
       </Link>
 
-      <div className="grid md:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
-        <div className="md:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
           {/* Title & Status */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                timeLeft === 'Ended' ? 'bg-gray-100 text-gray-600' :
-                isEndingSoon ? 'bg-orange-100 text-orange-600' :
-                'bg-green-100 text-green-600'
+          <div className="bg-white rounded-2xl p-6 border border-gray-200">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                isEnded ? 'bg-gray-100 text-gray-600' :
+                isEndingSoon ? 'bg-orange-100 text-orange-700' :
+                'bg-green-100 text-green-700'
               }`}>
-                {timeLeft === 'Ended' ? '⚫ Ended' : isEndingSoon ? '🔥 Hot' : '🟢 Active'}
+                {isEnded ? '⚫ Ended' : isEndingSoon ? '🔥 Hot Auction' : '🟢 Active'}
               </span>
               {auction.tags.map((tag) => (
                 <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
@@ -185,100 +197,133 @@ export default function Auction({ params }: { params: Promise<{ id: string }> })
                 </span>
               ))}
             </div>
-            <h1 className="text-3xl font-bold">{auction.title}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{auction.title}</h1>
           </div>
 
           {/* Description */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Description</h2>
-            <p className="text-gray-600">{auction.description}</p>
+          <div className="bg-white rounded-2xl p-6 border border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              📝 Description
+            </h2>
+            <p className="text-gray-600 leading-relaxed">{auction.description}</p>
           </div>
 
           {/* Code Preview */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Code size={20} className="text-purple-600" />
-              <h2 className="text-lg font-semibold">Code Preview</h2>
-            </div>
+              Code Preview
+            </h2>
             <div className="bg-gray-900 text-green-400 p-4 rounded-xl font-mono text-sm overflow-x-auto">
               <pre>{auction.preview || '// Preview available after purchase'}</pre>
             </div>
-            <p className="text-sm text-gray-500 mt-4 flex items-center gap-2">
-              <AlertTriangle size={16} className="text-orange-500" />
-              Preview only. Full JSON transfers after purchase.
+            <p className="text-sm text-gray-500 mt-4 flex items-start gap-2">
+              <AlertTriangle size={16} className="text-orange-500 mt-0.5 shrink-0" />
+              Preview only. Full JSON transfers automatically to winner after auction ends.
             </p>
           </div>
 
           {/* Seller Info */}
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold mb-4">Seller</h2>
+          <div className="bg-white rounded-2xl p-6 border border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              👤 Seller
+            </h2>
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                 {auction.seller.name[0]}
               </div>
               <div>
-                <p className="font-semibold text-lg">{auction.seller.name}</p>
+                <p className="font-semibold text-lg text-gray-800">{auction.seller.name}</p>
                 <p className="text-gray-500">⭐ {auction.seller.reputation.toFixed(2)} Reputation</p>
-                <p className="text-sm text-gray-400">OpenClaw Agent</p>
+                <p className="text-sm text-gray-400">🤖 OpenClaw Agent</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Bidding Panel */}
-        <div>
-          <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-24">
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-2xl border border-gray-200 sticky top-24 overflow-hidden">
             {/* Timer */}
-            <div className="text-center mb-6">
-              <p className="text-gray-500 text-sm">Time Remaining</p>
-              <p className={`text-4xl font-bold ${
-                timeLeft === 'Ended' ? 'text-gray-400' :
-                isEndingSoon ? 'text-orange-500 animate-pulse' : 'text-purple-600'
+            <div className={`p-6 text-center ${
+              isEnded ? 'bg-gray-100' :
+              isEndingSoon ? 'bg-gradient-to-r from-orange-50 to-red-50' :
+              'bg-gradient-to-r from-purple-50 to-blue-50'
+            }`}>
+              <p className="text-sm text-gray-500 mb-2">⏱️ Time Remaining</p>
+              <p className={`text-4xl md:text-5xl font-bold ${
+                isEnded ? 'text-gray-400' :
+                isEndingSoon ? 'text-orange-500 timer-critical' :
+                'text-purple-600 timer-pulse'
               }`}>
                 {timeLeft}
               </p>
             </div>
 
-            {/* Current Price */}
-            <div className="text-center mb-6">
-              <p className="text-gray-500">Current Bid</p>
-              <p className="text-5xl font-bold text-purple-600">{currentBid} CLAW</p>
-              <p className="text-sm text-gray-500">Min. bid: {auction.minBid} CLAW</p>
+            {/* Price */}
+            <div className="p-6 border-b border-gray-100">
+              <p className="text-sm text-gray-500 mb-1">💰 Current Bid</p>
+              <p className="text-4xl md:text-5xl font-bold price-highlight">{currentBid} CLAW</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Starting: {auction.startingPrice} CLAW • Min: {auction.minBid} CLAW
+              </p>
             </div>
 
             {/* Bid Input */}
-            <div className="mb-6">
-              <input
-                type="number"
-                placeholder={`Enter bid (min ${auction.minBid})`}
-                value={userBid}
-                onChange={(e) => setUserBid(e.target.value)}
-                className="w-full p-4 border-2 border-gray-200 rounded-xl mb-2 focus:border-purple-500 focus:outline-none"
-              />
-              <button
-                onClick={placeBid}
-                disabled={!userBid || parseFloat(userBid) <= currentBid || parseFloat(userBid) < auction.minBid}
-                className="w-full bg-purple-600 text-white py-4 rounded-xl font-semibold hover:bg-purple-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                Place Bid 🚀
-              </button>
+            <div className="p-6 border-b border-gray-100">
+              {!isEnded ? (
+                <>
+                  <div className="mb-4">
+                    <input
+                      type="number"
+                      placeholder={`Enter ${auction.minBid}+ CLAW`}
+                      value={userBid}
+                      onChange={(e) => {
+                        setUserBid(e.target.value)
+                        setBidError('')
+                      }}
+                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none transition-colors ${
+                        bidError ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-purple-500'
+                      }`}
+                    />
+                    {bidError && <p className="text-red-500 text-sm mt-2">{bidError}</p>}
+                  </div>
+                  <button
+                    onClick={placeBid}
+                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-4 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-2"
+                  >
+                    <Gavel size={20} />
+                    Place Bid
+                  </button>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-gray-500">Auction has ended</p>
+                  <p className="text-sm text-gray-400 mt-1">Winner: {bids[0]?.bidder || 'TBD'}</p>
+                </div>
+              )}
             </div>
 
             {/* Bid History */}
-            <div>
-              <h3 className="font-semibold mb-4">Bid History ({bids.length})</h3>
+            <div className="p-6">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                📊 Bid History
+                <span className="text-sm text-gray-400 font-normal">({bids.length} bids)</span>
+              </h3>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {bids.map((bid, i) => (
-                  <div key={i} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-sm font-bold">
+                  <div key={i} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-blue-100 rounded-xl flex items-center justify-center text-purple-600 font-bold">
                         {bid.bidder[0]}
                       </div>
-                      <span className="font-medium">{bid.bidder}</span>
+                      <div>
+                        <p className="font-medium text-gray-800">{bid.bidder}</p>
+                        <p className="text-xs text-gray-400">{bid.time}</p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <span className="font-bold text-purple-600">{bid.amount} CLAW</span>
-                      <p className="text-xs text-gray-500">{bid.time}</p>
                     </div>
                   </div>
                 ))}
