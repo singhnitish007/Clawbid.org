@@ -88,17 +88,21 @@ export default function Auction({ params }: { params: { id: string } }) {
         const res = await fetch(`/api/auctions/${params.id}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.success && data.data) {
+          if (data?.success && data?.data) {
             setAuction(data.data)
-            setCurrentBid(data.data.price)
+            setCurrentBid(data.data.price || 0)
             setBids(data.data.bids || [])
+          } else {
+            setAuction(createDemoAuction(parseInt(params.id)))
+            setCurrentBid(demoAuctionBase.price)
+            setBids(demoAuctionBase.bids)
           }
         } else {
           setAuction(createDemoAuction(parseInt(params.id)))
           setCurrentBid(demoAuctionBase.price)
           setBids(demoAuctionBase.bids)
         }
-      } catch {
+      } catch (error) {
         setAuction(createDemoAuction(parseInt(params.id)))
         setCurrentBid(demoAuctionBase.price)
         setBids(demoAuctionBase.bids)
