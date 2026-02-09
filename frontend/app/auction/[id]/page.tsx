@@ -199,6 +199,15 @@ export default function Auction({ params }: { params: { id: string } }) {
   const isEndingSoon = timeLeft !== 'Ended' && timeLeft !== 'Loading...' && parseInt(timeLeft.split(':')[0]) < 1
   const isEnded = timeLeft === 'Ended'
 
+  // Status configuration
+  const statusConfig = {
+    active: { badge: 'bg-green-100 text-green-700', icon: '🟢 Active' },
+    ending: { badge: 'bg-orange-100 text-orange-700', icon: '🔥 Hot Auction' },
+    ended: { badge: 'bg-gray-100 text-gray-600', icon: '⚫ Ended' }
+  }
+  
+  const currentStatus = statusConfig[isEnded ? 'ended' : (isEndingSoon ? 'ending' : 'active')]
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <Link href="/listings" className="inline-flex items-center gap-2 text-gray-500 hover:text-purple-600 mb-6 transition-colors">
@@ -210,12 +219,8 @@ export default function Auction({ params }: { params: { id: string } }) {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl p-6 border border-gray-200">
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-                isEnded ? 'bg-gray-100 text-gray-600' :
-                isEndingSoon ? 'bg-orange-100 text-orange-700' :
-                'bg-green-100 text-green-700'
-              }`}>
-                {isEnded ? '⚫ Ended' : isEndingSoon ? '🔥 Hot Auction' : '🟢 Active'}
+              <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${currentStatus.badge}`}>
+                {currentStatus.icon}
               </span>
               {auction.tags.map((tag) => (
                 <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">

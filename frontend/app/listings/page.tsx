@@ -301,48 +301,58 @@ function ListingCard({ listing, viewMode }: { listing: Listing & { status: strin
   const isEnded = listing.status === 'ended'
   const bidsCount = Array.isArray(listing.bids) ? listing.bids.length : listing.bids
 
+  // Status color mapping
+  const statusConfig = {
+    active: { badge: 'bg-green-100 text-green-700', border: 'border-green-200 hover:border-green-400', icon: '🟢 Active' },
+    ending: { badge: 'bg-orange-100 text-orange-700', border: 'border-orange-300 hover:border-orange-500', icon: '🔥 Hot' },
+    ended: { badge: 'bg-gray-100 text-gray-600', border: 'border-gray-200 hover:border-gray-400', icon: '⚫ Ended' }
+  }
+  
+  const status = statusConfig[listing.status as keyof typeof statusConfig] || statusConfig.active
+
   if (viewMode === 'list') {
     return (
       <Link href={`/auction/${listing.id}`}>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover flex items-center gap-6">
-          {/* Status Badge */}
-          <div className={`shrink-0 w-2 h-20 rounded-full ${
+        <div className="group bg-white rounded-xl border border-gray-200 p-6 card-hover transition-all duration-200 flex items-center gap-6 hover:shadow-md hover:border-purple-200">
+          {/* Status Indicator */}
+          <div className={`shrink-0 w-1.5 h-16 rounded-full transition-colors ${
             listing.status === 'active' ? 'bg-green-500' :
-            listing.status === 'ending' ? 'bg-orange-500' :
-            'bg-gray-400'
+            listing.status === 'ending' ? 'bg-orange-500' : 'bg-gray-400'
           }`} />
 
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-lg text-gray-800 truncate">{listing.title}</h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                listing.status === 'active' ? 'bg-green-100 text-green-700' :
-                listing.status === 'ending' ? 'bg-orange-100 text-orange-700' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {listing.status === 'active' ? '🟢 Active' : listing.status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+              <h3 className="font-semibold text-lg text-gray-800 truncate group-hover:text-purple-600 transition-colors">{listing.title}</h3>
+              <span className={`px-2.5 py-0.5 rounded-lg text-xs font-medium ${status.badge}`}>
+                {status.icon}
               </span>
             </div>
             <p className="text-gray-500 text-sm line-clamp-1">{listing.description}</p>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-              <span className="flex items-center gap-1">
-                <User size={14} />
+              <span className="flex items-center gap-1.5">
+                <div className="w-6 h-6 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
+                  <User size={12} className="text-purple-600" />
+                </div>
                 {listing.seller.name}
               </span>
-              <span>⭐ {listing.seller.reputation.toFixed(2)}</span>
-              <span>💬 {bidsCount} bids</span>
+              <span className="flex items-center gap-1">
+                ⭐ {listing.seller.reputation.toFixed(2)}
+              </span>
+              <span className="flex items-center gap-1">
+                💬 {bidsCount} bids
+              </span>
             </div>
           </div>
 
           {/* Price & Time */}
           <div className="text-right shrink-0">
-            <p className="text-2xl font-bold price-highlight">{listing.price} CLAW</p>
-            <p className={`text-sm font-medium ${
-              isEndingSoon ? 'text-orange-500 timer-pulse' :
+            <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">{listing.price} CLAW</p>
+            <p className={`text-sm font-medium mt-1 ${
+              isEndingSoon ? 'text-orange-500 animate-pulse' :
               isEnded ? 'text-gray-400' : 'text-gray-600'
             }`}>
-              {listing.timeLeft}
+              {listing.status === 'ended' ? 'Closed' : listing.timeLeft}
             </p>
           </div>
         </div>
@@ -350,67 +360,56 @@ function ListingCard({ listing, viewMode }: { listing: Listing & { status: strin
     )
   }
 
+  // Grid View
   return (
     <Link href={`/auction/${listing.id}`}>
-      <div className={`bg-white rounded-2xl border-2 overflow-hidden card-hover cursor-pointer ${
-        listing.status === 'active' ? 'border-green-200 hover:border-green-400' :
-        listing.status === 'ending' ? 'border-orange-300 hover:border-orange-500' :
-        'border-gray-200 hover:border-gray-400'
-      }`}>
+      <div className={`bg-white rounded-2xl border-2 overflow-hidden card-hover transition-all duration-200 hover:shadow-xl hover:-translate-y-1 ${status.border}`}>
         {/* Card Header */}
-        <div className="p-6">
+        <div className="p-6 pb-4">
           <div className="flex justify-between items-start mb-4">
-            <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-              listing.status === 'active' ? 'bg-green-100 text-green-700' :
-              listing.status === 'ending' ? 'bg-orange-100 text-orange-700' :
-              'bg-gray-100 text-gray-600'
-            }`}>
-              {listing.status === 'active' ? '🟢 Active' : listing.status === 'ending' ? '🔥 Hot' : '⚫ Ended'}
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${status.badge}`}>
+              {status.icon}
             </span>
-            <span className="text-sm text-gray-500 flex items-center gap-1">
-              <User size={14} />
+            <div className="flex items-center gap-1.5 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+              <div className="w-5 h-5 bg-gradient-to-br from-purple-100 to-purple-200 rounded flex items-center justify-center">
+                <User size={12} className="text-purple-600" />
+              </div>
               {listing.seller.name}
-            </span>
+            </div>
           </div>
 
-          <h3 className="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
-          <p className="text-gray-500 text-sm line-clamp-2 mb-4">{listing.description}</p>
+          <h3 className="font-bold text-lg text-gray-800 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">{listing.title}</h3>
+          <p className="text-gray-500 text-sm line-clamp-2 mb-4 leading-relaxed">{listing.description}</p>
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {listing.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+              <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-medium">
                 {tag}
               </span>
             ))}
           </div>
-
-          {/* Price & Time */}
-          <div className="flex justify-between items-end pt-4 border-t border-gray-100">
-            <div>
-              <p className="text-sm text-gray-500">Current Bid</p>
-              <p className="text-2xl font-bold price-highlight">{listing.price} CLAW</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500 flex items-center gap-1 justify-end">
-                <Clock size={14} />
-                {listing.status === 'ended' ? '' : 'Left'}
-              </p>
-              <p className={`font-semibold ${
-                isEndingSoon ? 'text-orange-500 timer-pulse' :
-                isEnded ? 'text-gray-400' : 'text-gray-700'
-              }`}>
-                {listing.timeLeft}
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Card Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-          <span className="text-sm text-gray-500">⭐ {listing.seller.reputation.toFixed(2)}</span>
-          <span className="text-sm text-gray-500">💬 {bidsCount} bids</span>
+        <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">⭐ {listing.seller.reputation.toFixed(2)}</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-sm text-gray-500">💬 {bidsCount}</span>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Current Bid</p>
+            <p className="text-xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">{listing.price} CLAW</p>
+          </div>
         </div>
+
+        {/* Timer Bar */}
+        {listing.status !== 'ended' && (
+          <div className={`h-1 ${
+            isEndingSoon ? 'bg-orange-400' : 'bg-green-500'
+          }`} style={{ width: '100%' }} />
+        )}
       </div>
     </Link>
   )
